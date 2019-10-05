@@ -15,6 +15,7 @@ def get_wall_upload_server():
     url = "https://api.vk.com/method/photos.getWallUploadServer?group_id={0}&access_token={1}&v=5.101".format(
         GROUP_ID, ACCESS_TOKEN)
     response = requests.get(url)
+    response.raise_for_status()
     response = response.json()
     return response
 
@@ -28,6 +29,7 @@ def upload_photo(random_image):
         }
         response = requests.post(upload_url, files=files)
         response.raise_for_status()
+        response.raise_for_status()
         response = response.json()
         return response
 
@@ -39,6 +41,7 @@ def save_wall_photo(upload_photo):
     url = "https://api.vk.com/method/photos.saveWallPhoto?group_id={0}&photo={1}&server={2}&hash={3}&access_token={4}&v=5.101".format(
         GROUP_ID, photo, server, hash_info, ACCESS_TOKEN)
     response = requests.post(url)
+    response.raise_for_status()
     response = response.json()
     return response
 
@@ -50,6 +53,7 @@ def post_photo(saved_photo, random_image):
     url = "https://api.vk.com/method/wall.post?owner_id=-{0}&access_token={1}&v=5.101&attachments=photo{2}_{3}&from_group=0&message={4}".format(
         GROUP_ID, ACCESS_TOKEN, owner_id, media_id, message)
     response = requests.post(url)
+    response.raise_for_status()
     posted_photo = response.json()
     return posted_photo
 
@@ -57,6 +61,7 @@ def post_photo(saved_photo, random_image):
 def get_number_of_last_comic():
     url = "http://xkcd.com/353/info.0.json"
     response = requests.get(url)
+    response.raise_for_status()
     response = response.json()
     number_of_last_comic = response["num"]
     return number_of_last_comic
@@ -68,6 +73,7 @@ def save_random_image():
     random_comic = random.randint(1, last_comic)
     url = "http://xkcd.com/{}/info.0.json".format(random_comic)
     response = requests.get(url)
+    response.raise_for_status()
     response = response.json()
     image_url = response["img"]
     image_title = response["title"]
@@ -81,8 +87,13 @@ def save_random_image():
 
 
 if __name__ == "__main__":
-    random_image = save_random_image()
-    uploaded_photo = upload_photo(random_image[0])
-    saved_photo = save_wall_photo(uploaded_photo)
-    posted_photo = post_photo(saved_photo, random_image)
-    os.remove(random_image[0])
+	try: 
+		random_image = save_random_image()
+		uploaded_photo = upload_photo(random_image[0])
+		saved_photo = save_wall_photo(uploaded_photo)
+		posted_photo = post_photo(saved_photo, random_image)
+	except requests.exceptions.HTTPError as error:
+		exit("Can't get data from server:\n{0}".format(error))
+	except requests.exceptions.ConnectionError as error:
+		exit("Can't get data from server:\n{0}".format(error))
+	os.remove(random_image[0])
