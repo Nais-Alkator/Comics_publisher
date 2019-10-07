@@ -4,17 +4,11 @@ import os
 from os import makedirs
 from dotenv import load_dotenv
 
-load_dotenv()
-
-
-ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
-GROUP_ID = os.getenv("GROUP_ID")
-
 
 def get_wall_upload_server():
-    url = "https://api.vk.com/method/photos.getWallUploadServer?group_id={0}&access_token={1}&v=5.101".format(
-        GROUP_ID, ACCESS_TOKEN)
-    response = requests.get(url)
+    url = "https://api.vk.com/method/photos.getWallUploadServer"
+    params = {"access_token": access_token, "group_id": group_id, "v": "5.101"}
+    response = requests.get(url, params=params)
     response.raise_for_status()
     response = response.json()
     return response
@@ -29,18 +23,17 @@ def upload_photo(random_image):
         }
         response = requests.post(upload_url, files=files)
         response.raise_for_status()
-        response.raise_for_status()
         response = response.json()
         return response
 
 
 def save_wall_photo(upload_photo):
-    photo = str(upload_photo["photo"])
-    server = str(upload_photo["server"])
-    hash_info = str(upload_photo["hash"])
-    url = "https://api.vk.com/method/photos.saveWallPhoto?group_id={0}&photo={1}&server={2}&hash={3}&access_token={4}&v=5.101".format(
-        GROUP_ID, photo, server, hash_info, ACCESS_TOKEN)
-    response = requests.post(url)
+    photo = upload_photo["photo"]
+    server = upload_photo["server"]
+    hash_info = upload_photo["hash"]
+    url = "https://api.vk.com/method/photos.saveWallPhoto"
+    params = {"group_id": group_id, "photo": photo, "server": server, "hash": hash_info, "access_token": access_token, "v": "5.101"}
+    response = requests.post(url, params=params)
     response.raise_for_status()
     response = response.json()
     return response
@@ -51,15 +44,17 @@ def post_photo(saved_photo, random_image):
     owner_id = saved_photo["response"][0]["owner_id"]
     message = random_image[1]
     url = "https://api.vk.com/method/wall.post?owner_id=-{0}&access_token={1}&v=5.101&attachments=photo{2}_{3}&from_group=0&message={4}".format(
-        GROUP_ID, ACCESS_TOKEN, owner_id, media_id, message)
+        group_id, access_token, owner_id, media_id, message)
+    params = {"owner_id": "-{}".format(group_id), "access_token": access_token, "v": "5.101", "attachments": "photo{0}{1}".format(owner_id, media_id), "from_group": "0", "message": message}
     response = requests.post(url)
-    response.raise_for_status()
     posted_photo = response.json()
+    if 'error' in posted_photo:
+        raise requests.exceptions.HTTPError(posted_photo['error'])
     return posted_photo
 
 
 def get_number_of_last_comic():
-    url = "http://xkcd.com/353/info.0.json"
+    url = "http://xkcd.com/info.0.json"
     response = requests.get(url)
     response.raise_for_status()
     response = response.json()
@@ -78,22 +73,26 @@ def save_random_image():
     image_url = response["img"]
     image_title = response["title"]
     comments = response["alt"]
-    file_name = ("images/" + image_title + ".png")
+    image_path = "images/{}.png".format(image_title)
     response = requests.get(image_url, verify=False)
     response.raise_for_status()
-    with open(file_name, 'wb') as file:
+    with open(image_path, 'wb') as file:
         file.write(response.content)
-    return [file_name, comments]
+    return [image_path, comments]
 
 
 if __name__ == "__main__":
-	try: 
-		random_image = save_random_image()
-		uploaded_photo = upload_photo(random_image[0])
-		saved_photo = save_wall_photo(uploaded_photo)
-		posted_photo = post_photo(saved_photo, random_image)
-	except requests.exceptions.HTTPError as error:
-		exit("Can't get data from server:\n{0}".format(error))
-	except requests.exceptions.ConnectionError as error:
-		exit("Can't get data from server:\n{0}".format(error))
-	os.remove(random_image[0])
+    load_dotenv()
+    access_token = os.getenv("ACCESS_TOKEN")
+    group_id = os.getenv("GROUP_ID")
+    try: 
+        random_image = save_random_image()
+        image_path = random_image[0]
+        uploaded_photo = upload_photo(image_path)
+        saved_photo = save_wall_photo(uploaded_photo)
+        posted_photo = post_photo(saved_photo, random_image)
+    except requests.exceptions.HTTPError as error:
+        exit("Can't get data from server:\n{0}".format(error))
+    except requests.exceptions.ConnectionError as error:
+        exit("Can't get data from server:\n{0}".format(error))
+    os.remove(image_path)
