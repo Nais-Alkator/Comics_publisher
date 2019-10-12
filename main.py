@@ -3,14 +3,16 @@ import random
 import os
 from os import makedirs
 from dotenv import load_dotenv
+import tempfile
 
 
 def get_wall_upload_server():
     url = "https://api.vk.com/method/photos.getWallUploadServer"
     params = {"access_token": access_token, "group_id": group_id, "v": "5.101"}
     response = requests.get(url, params=params)
-    response.raise_for_status()
     response = response.json()
+    if 'error' in response:
+        raise requests.exceptions.HTTPError(response['error'])
     return response
 
 
@@ -22,7 +24,6 @@ def upload_photo(random_image):
             'photo': file,
         }
         response = requests.post(upload_url, files=files)
-        response.raise_for_status()
         response = response.json()
         return response
 
@@ -34,8 +35,9 @@ def save_wall_photo(upload_photo):
     url = "https://api.vk.com/method/photos.saveWallPhoto"
     params = {"group_id": group_id, "photo": photo, "server": server, "hash": hash_info, "access_token": access_token, "v": "5.101"}
     response = requests.post(url, params=params)
-    response.raise_for_status()
     response = response.json()
+    if 'error' in response:
+        raise requests.exceptions.HTTPError(response['error'])
     return response
 
 
@@ -63,7 +65,11 @@ def get_number_of_last_comic():
 
 
 def save_random_image():
-    makedirs("images", exist_ok=True)
+    try:
+        temporary_directory = tempfile.TemporaryDirectory()
+        temporary_directory = tempfile.gettempdir()
+    except ValueError:
+        exit()
     last_comic = get_number_of_last_comic()
     random_comic = random.randint(1, last_comic)
     url = "http://xkcd.com/{}/info.0.json".format(random_comic)
@@ -73,7 +79,7 @@ def save_random_image():
     image_url = response["img"]
     image_title = response["title"]
     comments = response["alt"]
-    image_path = "images/{}.png".format(image_title)
+    image_path = "{0}/{1}.png".format(temporary_directory, image_title)
     response = requests.get(image_url, verify=False)
     response.raise_for_status()
     with open(image_path, 'wb') as file:
@@ -95,4 +101,3 @@ if __name__ == "__main__":
         exit("Can't get data from server:\n{0}".format(error))
     except requests.exceptions.ConnectionError as error:
         exit("Can't get data from server:\n{0}".format(error))
-    os.remove(image_path)
